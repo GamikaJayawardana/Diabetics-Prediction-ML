@@ -13,12 +13,26 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 2. Custom CSS for Styling Buttons ---
+# --- 2. Load Models & Assets ---
+
+
+@st.cache_resource
+def load_assets():
+    try:
+        model = joblib.load('diabetes_model.pkl')
+        return model
+    except Exception as e:
+        st.error(f"Error loading model file: {e}")
+        return None
+
+
+model = load_assets()
+
+# --- 3. Custom CSS for Styling ---
 st.markdown("""
 <style>
-/* Style the Main 'Run Prediction' Button */
 div.stButton > button:first-child {
-    background: linear-gradient(to right, #4b6cb7, #182848); /* Modern Blue Gradient */
+    background: linear-gradient(to right, #4b6cb7, #182848);
     color: white;
     font-size: 20px;
     font-weight: bold;
@@ -29,54 +43,23 @@ div.stButton > button:first-child {
     transition: all 0.3s ease;
     width: 100%;
 }
-
-/* Hover Effect */
 div.stButton > button:first-child:hover {
     background: linear-gradient(to right, #182848, #4b6cb7);
     transform: translateY(-2px);
     box-shadow: 0px 6px 8px rgba(0,0,0,0.3);
 }
-
-/* Active (Click) Effect */
-div.stButton > button:first-child:active {
-    transform: translateY(1px);
-    box-shadow: 0px 2px 4px rgba(0,0,0,0.2);
-}
 </style>
 """, unsafe_allow_html=True)
-
-# --- 3. Load Models & Assets ---
-
-
-@st.cache_resource
-def load_assets():
-    try:
-        model = joblib.load('diabetes_model.pkl')
-        scaler = joblib.load('scaler.pkl')
-        imputer = joblib.load('knn_imputer.pkl')
-        return model, scaler, imputer
-    except Exception as e:
-        st.error(f"Error loading model files: {e}")
-        return None, None, None
-
-
-model, scaler, imputer = load_assets()
 
 # --- 4. Helper Functions ---
 
 
 def get_radar_chart(input_data, risk_color):
-    """
-    Creates a Radar Chart.
-    """
     categories = ['Glucose', 'BloodPressure',
                   'SkinThickness', 'Insulin', 'BMI', 'Age']
-
-    # Average values (Approximations from Pima Dataset)
     avg_healthy = [110, 70, 27, 80, 30, 27]
     avg_diabetic = [142, 75, 33, 100, 35, 37]
 
-    # Extract user values
     user_values = [
         input_data['Glucose'][0],
         input_data['BloodPressure'][0],
@@ -86,30 +69,21 @@ def get_radar_chart(input_data, risk_color):
         input_data['Age'][0]
     ]
 
-    # Define explicit fill colors based on risk
     if risk_color == 'green':
-        fill_color = 'rgba(40, 167, 69, 0.4)'  # Nice Green
+        fill_color = 'rgba(40, 167, 69, 0.4)'
         line_color = '#28a745'
     else:
-        fill_color = 'rgba(220, 53, 69, 0.4)'  # Nice Red
+        fill_color = 'rgba(220, 53, 69, 0.4)'
         line_color = '#dc3545'
 
     fig = go.Figure()
-
-    # Background Reference Shapes
     fig.add_trace(go.Scatterpolar(r=avg_healthy, theta=categories,
                   fill='toself', name='Avg Healthy', line_color='blue', opacity=0.1))
     fig.add_trace(go.Scatterpolar(r=avg_diabetic, theta=categories,
                   fill='toself', name='Avg Diabetic', line_color='orange', opacity=0.1))
-
-    # User Shape (Dynamic Color)
     fig.add_trace(go.Scatterpolar(
-        r=user_values,
-        theta=categories,
-        fill='toself',
-        name='Current Patient',
-        line=dict(color=line_color, width=3),
-        fillcolor=fill_color
+        r=user_values, theta=categories, fill='toself', name='Current Patient',
+        line=dict(color=line_color, width=3), fillcolor=fill_color
     ))
 
     fig.update_layout(
@@ -123,7 +97,7 @@ def get_radar_chart(input_data, risk_color):
 
 
 # --- 5. Main UI Layout ---
-st.title("🏥 Intelligent Diabetes Prediction System")
+st.title(" Intelligent Diabetes Prediction System")
 st.markdown(
     "Enter the patient's clinical data below to assess diabetes risk using **XGBoost AI**.")
 
@@ -159,7 +133,6 @@ with st.container():
         age = st.number_input("Age (years)", min_value=1,
                               max_value=120, value=29, step=1)
 
-    # Collect into DataFrame
     input_data = {
         'Pregnancies': pregnancies,
         'Glucose': glucose,
@@ -180,46 +153,46 @@ col_results, col_viz = st.columns([1, 1.5])
 with col_results:
     st.subheader("Analysis Results")
 
-    # Just a standard button call, but the CSS above will transform it
     if st.button("RUN DIAGNOSIS", use_container_width=True):
 
-        # 1. Preprocessing
+        # --- FIX: BYPASS SCALING ---
+        # We send the RAW data directly to the model.
         user_data = input_df.values
+
+        # Optional: Replace 0 with NaN for biological metrics
         cols_missing_vals = [1, 2, 3, 4, 5]
         for col in cols_missing_vals:
             if user_data[0, col] == 0:
                 user_data[0, col] = np.nan
 
-        # 2. Scale & Impute
-        user_data_scaled = scaler.transform(user_data)
-        user_data_imputed = imputer.transform(user_data_scaled)
+        # Direct Prediction on RAW Data
+        try:
+            prediction_proba = model.predict_proba(user_data)
+            diabetic_prob = float(prediction_proba[0][1])
+        except Exception as e:
+            st.error(f"Prediction Error: {e}")
+            diabetic_prob = 0.0
 
-        # 3. Predict
-        prediction_proba = model.predict_proba(user_data_imputed)
-        diabetic_prob = float(prediction_proba[0][1])
-
-        # 4. Determine Colors & Status
+        # Determine Status
         if diabetic_prob > 0.5:
-            # High Risk Case
             result_color = "red"
             result_header = "🔴 HIGH RISK DETECTED"
             result_msg = "The model indicates a high probability of diabetes."
         else:
-            # Low Risk Case
             result_color = "green"
             result_header = "🟢 LOW RISK / HEALTHY"
             result_msg = "Great! The model indicates a low probability of diabetes."
 
-        # 5. Save to Session State
+        # Save to Session State
         st.session_state['run_analysis'] = True
-        st.session_state['user_data_imputed'] = user_data_imputed
+        st.session_state['user_data'] = user_data  # Save raw data
         st.session_state['diabetic_prob'] = diabetic_prob
         st.session_state['input_df'] = input_df
         st.session_state['result_color'] = result_color
         st.session_state['result_header'] = result_header
         st.session_state['result_msg'] = result_msg
 
-    # Display Results (Persistent)
+    # Display Results
     if 'run_analysis' in st.session_state and st.session_state['run_analysis']:
         header = st.session_state['result_header']
         msg = st.session_state['result_msg']
@@ -229,7 +202,6 @@ with col_results:
         st.markdown(f"<div style='margin-top: 20px;'></div>",
                     unsafe_allow_html=True)
 
-        # DYNAMIC RESULT CARD
         if color == 'green':
             st.markdown(f"""
             <div style="background-color: #d4edda; color: #155724; padding: 20px; border-radius: 10px; border: 2px solid #c3e6cb; text-align: center;">
@@ -237,7 +209,7 @@ with col_results:
                 <p style="margin-top:10px; font-size:18px;">{msg}</p>
             </div>
             """, unsafe_allow_html=True)
-            st.balloons()
+            # BALLOONS REMOVED HERE
         else:
             st.markdown(f"""
             <div style="background-color: #f8d7da; color: #721c24; padding: 20px; border-radius: 10px; border: 2px solid #f5c6cb; text-align: center;">
@@ -251,7 +223,7 @@ with col_results:
         st.write(f"**Confidence Score:** {prob*100:.1f}%")
         st.progress(prob)
 
-# --- 7. Visualization Section (Right Column) ---
+# --- 7. Visualization Section ---
 with col_viz:
     if 'run_analysis' in st.session_state and st.session_state['run_analysis']:
 
@@ -265,7 +237,8 @@ with col_viz:
         with tab2:
             st.write("### What is driving this result?")
             try:
-                data_for_shap = st.session_state['user_data_imputed']
+                # Use RAW data for SHAP
+                data_for_shap = st.session_state['user_data']
                 explainer = shap.TreeExplainer(model)
                 shap_values = explainer.shap_values(data_for_shap)
 
@@ -274,7 +247,6 @@ with col_viz:
                 else:
                     shap_val_to_plot = shap_values[0]
 
-                # Top Factors Logic
                 feature_names = st.session_state['input_df'].columns
                 top_indices = np.argsort(np.abs(shap_val_to_plot))[-3:][::-1]
 
@@ -308,9 +280,7 @@ with col_viz:
 
             except Exception as e:
                 st.warning(f"Explanation could not be generated: {e}")
-    else:
-        st.info("👈 Enter data and click 'RUN DIAGNOSIS' to start.")
+  
 
-# --- 8. Footer ---
 st.markdown("---")
 st.caption("Developed for Intelligent Systems Module")
