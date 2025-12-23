@@ -6,14 +6,46 @@ import shap
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 
-# Set Page Configuration (Must be the first line)
+# --- 1. Page Configuration ---
 st.set_page_config(
-    page_title="Diabetes Risk AI",
+    page_title="Diabetes Prediction System",
     page_icon="🏥",
     layout="wide"
 )
 
-# --- 1. Load Models & Assets ---
+# --- 2. Custom CSS for Styling Buttons ---
+st.markdown("""
+<style>
+/* Style the Main 'Run Prediction' Button */
+div.stButton > button:first-child {
+    background: linear-gradient(to right, #4b6cb7, #182848); /* Modern Blue Gradient */
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    padding: 15px 30px;
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0px 4px 6px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+/* Hover Effect */
+div.stButton > button:first-child:hover {
+    background: linear-gradient(to right, #182848, #4b6cb7);
+    transform: translateY(-2px);
+    box-shadow: 0px 6px 8px rgba(0,0,0,0.3);
+}
+
+/* Active (Click) Effect */
+div.stButton > button:first-child:active {
+    transform: translateY(1px);
+    box-shadow: 0px 2px 4px rgba(0,0,0,0.2);
+}
+</style>
+""", unsafe_allow_html=True)
+
+# --- 3. Load Models & Assets ---
 
 
 @st.cache_resource
@@ -30,22 +62,21 @@ def load_assets():
 
 model, scaler, imputer = load_assets()
 
-# --- 2. Helper Functions ---
+# --- 4. Helper Functions ---
 
 
-def get_radar_chart(input_data):
+def get_radar_chart(input_data, risk_color):
     """
-    Creates a Radar Chart comparing User Data vs Average Diabetic vs Average Healthy.
-    Note: Averages are approximated from the Pima Indians Diabetes Dataset.
+    Creates a Radar Chart.
     """
     categories = ['Glucose', 'BloodPressure',
                   'SkinThickness', 'Insulin', 'BMI', 'Age']
 
-    # Average values from the dataset (Approximations)
+    # Average values (Approximations from Pima Dataset)
     avg_healthy = [110, 70, 27, 80, 30, 27]
     avg_diabetic = [142, 75, 33, 100, 35, 37]
 
-    # Extract user values for these specific columns
+    # Extract user values
     user_values = [
         input_data['Glucose'][0],
         input_data['BloodPressure'][0],
@@ -55,45 +86,81 @@ def get_radar_chart(input_data):
         input_data['Age'][0]
     ]
 
+    # Define explicit fill colors based on risk
+    if risk_color == 'green':
+        fill_color = 'rgba(40, 167, 69, 0.4)'  # Nice Green
+        line_color = '#28a745'
+    else:
+        fill_color = 'rgba(220, 53, 69, 0.4)'  # Nice Red
+        line_color = '#dc3545'
+
     fig = go.Figure()
 
+    # Background Reference Shapes
+    fig.add_trace(go.Scatterpolar(r=avg_healthy, theta=categories,
+                  fill='toself', name='Avg Healthy', line_color='blue', opacity=0.1))
+    fig.add_trace(go.Scatterpolar(r=avg_diabetic, theta=categories,
+                  fill='toself', name='Avg Diabetic', line_color='orange', opacity=0.1))
+
+    # User Shape (Dynamic Color)
     fig.add_trace(go.Scatterpolar(
-        r=avg_healthy, theta=categories, fill='toself', name='Avg Healthy'
-    ))
-    fig.add_trace(go.Scatterpolar(
-        r=avg_diabetic, theta=categories, fill='toself', name='Avg Diabetic'
-    ))
-    fig.add_trace(go.Scatterpolar(
-        r=user_values, theta=categories, fill='toself', name='Your Data',
-        line_color='red', opacity=0.8
+        r=user_values,
+        theta=categories,
+        fill='toself',
+        name='Current Patient',
+        line=dict(color=line_color, width=3),
+        fillcolor=fill_color
     ))
 
     fig.update_layout(
         polar=dict(radialaxis=dict(visible=True, range=[0, 200])),
         showlegend=True,
-        title="Your Health Profile vs. Population Averages"
+        margin=dict(l=50, r=50, t=30, b=30),
+        height=400,
+        title=dict(text="Patient Profile vs Averages", x=0.5)
     )
     return fig
 
 
-# --- 3. Sidebar Inputs ---
-st.sidebar.image(
-    "https://cdn-icons-png.flaticon.com/512/2966/2966327.png", width=100)
-st.sidebar.title("Patient Data")
-st.sidebar.write("Adjust the values below:")
+# --- 5. Main UI Layout ---
+st.title("🏥 Intelligent Diabetes Prediction System")
+st.markdown(
+    "Enter the patient's clinical data below to assess diabetes risk using **XGBoost AI**.")
 
+st.divider()
 
-def user_input_features():
-    pregnancies = st.sidebar.slider('Pregnancies', 0, 17, 1)
-    glucose = st.sidebar.slider('Glucose Level (mg/dL)', 0, 200, 110)
-    bp = st.sidebar.slider('Blood Pressure (mm Hg)', 0, 122, 72)
-    skin = st.sidebar.slider('Skin Thickness (mm)', 0, 99, 25)
-    insulin = st.sidebar.slider('Insulin Level (mu U/ml)', 0, 846, 80)
-    bmi = st.sidebar.slider('BMI', 0.0, 67.1, 32.0)
-    dpf = st.sidebar.slider('Diabetes Pedigree Function', 0.078, 2.42, 0.3725)
-    age = st.sidebar.slider('Age (years)', 21, 81, 29)
+# Input Form Area
+with st.container():
+    st.subheader("Patient Clinical Data")
 
-    data = {
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        pregnancies = st.number_input(
+            "Pregnancies", min_value=0, max_value=20, value=1, step=1)
+        insulin = st.number_input(
+            "Insulin (mu U/ml)", min_value=0, max_value=900, value=80, step=1)
+
+    with c2:
+        glucose = st.number_input(
+            "Glucose (mg/dL)", min_value=0, max_value=300, value=110, step=1)
+        bmi = st.number_input(
+            "BMI", min_value=0.0, max_value=70.0, value=32.0, step=0.1, format="%.1f")
+
+    with c3:
+        bp = st.number_input("Blood Pressure (mm Hg)",
+                             min_value=0, max_value=140, value=72, step=1)
+        dpf = st.number_input("Diabetes Pedigree Func", min_value=0.000,
+                              max_value=3.000, value=0.372, step=0.001, format="%.3f")
+
+    with c4:
+        skin = st.number_input("Skin Thickness (mm)",
+                               min_value=0, max_value=100, value=25, step=1)
+        age = st.number_input("Age (years)", min_value=1,
+                              max_value=120, value=29, step=1)
+
+    # Collect into DataFrame
+    input_data = {
         'Pregnancies': pregnancies,
         'Glucose': glucose,
         'BloodPressure': bp,
@@ -103,120 +170,147 @@ def user_input_features():
         'DiabetesPedigreeFunction': dpf,
         'Age': age
     }
-    return pd.DataFrame([data])
+    input_df = pd.DataFrame([input_data])
 
+st.divider()
 
-input_df = user_input_features()
+# --- 6. Prediction & Results ---
+col_results, col_viz = st.columns([1, 1.5])
 
-# --- 4. Main App Layout ---
-st.title("🏥 Intelligent Diabetes Prediction System")
-st.markdown("""
-This application uses **Machine Learning (XGBoost)** to assess the likelihood of diabetes.
-It explains *why* a result was predicted and compares your metrics to population averages.
-""")
+with col_results:
+    st.subheader("Analysis Results")
 
-col_main_1, col_main_2 = st.columns([1, 1])
+    # Just a standard button call, but the CSS above will transform it
+    if st.button("RUN DIAGNOSIS", use_container_width=True):
 
-with col_main_1:
-    st.subheader("Patient Overview")
-    st.dataframe(input_df.T.rename(columns={0: 'Value'}), height=300)
+        # 1. Preprocessing
+        user_data = input_df.values
+        cols_missing_vals = [1, 2, 3, 4, 5]
+        for col in cols_missing_vals:
+            if user_data[0, col] == 0:
+                user_data[0, col] = np.nan
 
-# --- 5. Prediction Logic ---
-if st.button("Analyze Risk", type="primary"):
+        # 2. Scale & Impute
+        user_data_scaled = scaler.transform(user_data)
+        user_data_imputed = imputer.transform(user_data_scaled)
 
-    # 5a. Preprocessing (Must match training exactly)
-    # Convert dataframe to numpy array
-    user_data = input_df.values
+        # 3. Predict
+        prediction_proba = model.predict_proba(user_data_imputed)
+        diabetic_prob = float(prediction_proba[0][1])
 
-    # Step A: Replace 0s with NaN for specific columns (Glucose, BP, Skin, Insulin, BMI)
-    # Column indices in input_df: Glucose(1), BP(2), Skin(3), Insulin(4), BMI(5)
-    cols_missing_vals = [1, 2, 3, 4, 5]
-    for col in cols_missing_vals:
-        if user_data[0, col] == 0:
-            user_data[0, col] = np.nan
-
-    # Step B: Scale
-    user_data_scaled = scaler.transform(user_data)
-
-    # Step C: Impute
-    user_data_imputed = imputer.transform(user_data_scaled)
-
-    # 5b. Prediction
-    prediction = model.predict(user_data_imputed)
-    prediction_proba = model.predict_proba(user_data_imputed)
-
-    # Get probability of being diabetic (class 1)
-    diabetic_prob = prediction_proba[0][1]
-
-    # --- 6. Results Display ---
-    with col_main_2:
-        st.subheader("Risk Assessment")
-
-        # Gauge Chart / Probability Bar
+        # 4. Determine Colors & Status
         if diabetic_prob > 0.5:
-            st.error(f"Result: **High Risk of Diabetes**")
-            bar_color = "red"
+            # High Risk Case
+            result_color = "red"
+            result_header = "🔴 HIGH RISK DETECTED"
+            result_msg = "The model indicates a high probability of diabetes."
         else:
-            st.success(f"Result: **Low Risk of Diabetes**")
-            bar_color = "green"
+            # Low Risk Case
+            result_color = "green"
+            result_header = "🟢 LOW RISK / HEALTHY"
+            result_msg = "Great! The model indicates a low probability of diabetes."
 
-        st.write(f"Probability: **{diabetic_prob * 100:.2f}%**")
-        st.progress(diabetic_prob)
+        # 5. Save to Session State
+        st.session_state['run_analysis'] = True
+        st.session_state['user_data_imputed'] = user_data_imputed
+        st.session_state['diabetic_prob'] = diabetic_prob
+        st.session_state['input_df'] = input_df
+        st.session_state['result_color'] = result_color
+        st.session_state['result_header'] = result_header
+        st.session_state['result_msg'] = result_msg
 
-        if diabetic_prob > 0.5:
-            st.warning(
-                "⚠️ Recommendation: Please consult a healthcare professional for a formal diagnosis.")
+    # Display Results (Persistent)
+    if 'run_analysis' in st.session_state and st.session_state['run_analysis']:
+        header = st.session_state['result_header']
+        msg = st.session_state['result_msg']
+        prob = st.session_state['diabetic_prob']
+        color = st.session_state['result_color']
+
+        st.markdown(f"<div style='margin-top: 20px;'></div>",
+                    unsafe_allow_html=True)
+
+        # DYNAMIC RESULT CARD
+        if color == 'green':
+            st.markdown(f"""
+            <div style="background-color: #d4edda; color: #155724; padding: 20px; border-radius: 10px; border: 2px solid #c3e6cb; text-align: center;">
+                <h2 style="margin:0;">{header}</h2>
+                <p style="margin-top:10px; font-size:18px;">{msg}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            st.balloons()
         else:
-            st.info(
-                "✅ Recommendation: Maintain a healthy lifestyle and regular checkups.")
+            st.markdown(f"""
+            <div style="background-color: #f8d7da; color: #721c24; padding: 20px; border-radius: 10px; border: 2px solid #f5c6cb; text-align: center;">
+                <h2 style="margin:0;">{header}</h2>
+                <p style="margin-top:10px; font-size:18px;">{msg}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-    st.divider()
+        st.markdown(f"<div style='margin-top: 20px;'></div>",
+                    unsafe_allow_html=True)
+        st.write(f"**Confidence Score:** {prob*100:.1f}%")
+        st.progress(prob)
 
-    # --- 7. Advanced Visualization & Explainability ---
+# --- 7. Visualization Section (Right Column) ---
+with col_viz:
+    if 'run_analysis' in st.session_state and st.session_state['run_analysis']:
 
-    tab1, tab2 = st.tabs(["📊 Comparative Analysis", "🧠 AI Explanation (SHAP)"])
+        tab1, tab2 = st.tabs(["📊 Visual Comparison", "🧠 Simple Explanation"])
 
-    with tab1:
-        # Radar Chart
-        st.plotly_chart(get_radar_chart(input_df), use_container_width=True)
-        st.caption(
-            "This chart compares your values (Red) against the average Healthy person (Blue) and Diabetic person (Orange).")
+        with tab1:
+            risk_color = st.session_state.get('result_color', 'blue')
+            st.plotly_chart(get_radar_chart(
+                st.session_state['input_df'], risk_color), use_container_width=True)
 
-    with tab2:
-        st.write("How did the model reach this conclusion?")
+        with tab2:
+            st.write("### What is driving this result?")
+            try:
+                data_for_shap = st.session_state['user_data_imputed']
+                explainer = shap.TreeExplainer(model)
+                shap_values = explainer.shap_values(data_for_shap)
 
-        # Calculate SHAP values
-        # Note: We use the *imputed* data for explanation because that's what the model sees
-        try:
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(user_data_imputed)
+                if isinstance(shap_values, list):
+                    shap_val_to_plot = shap_values[1][0]
+                else:
+                    shap_val_to_plot = shap_values[0]
 
-            # Plot
-            fig, ax = plt.subplots(figsize=(10, 5))
-            # Force plot or Waterfall plot
-            # Since shap_values for classification might be a list or array depending on XGBoost version:
-            if isinstance(shap_values, list):
-                # Binary classification usually returns a list of two arrays
-                shap_val_to_plot = shap_values[1][0]
-                base_value = explainer.expected_value[1]
-            else:
-                shap_val_to_plot = shap_values[0]
-                base_value = explainer.expected_value
+                # Top Factors Logic
+                feature_names = st.session_state['input_df'].columns
+                top_indices = np.argsort(np.abs(shap_val_to_plot))[-3:][::-1]
 
-            # Create a Waterfall plot
-            shap.plots.waterfall(
-                shap.Explanation(values=shap_val_to_plot,
-                                 base_values=base_value,
-                                 data=input_df.iloc[0],
-                                 feature_names=input_df.columns)
-            )
-            st.pyplot(bbox_inches='tight')
-            st.caption(
-                "Red bars increase the risk, Blue bars decrease the risk.")
+                st.info(
+                    "Here are the top factors influencing this specific prediction:")
+                for idx in top_indices:
+                    impact = shap_val_to_plot[idx]
+                    feature = feature_names[idx]
+                    val = st.session_state['input_df'].iloc[0][feature]
 
-        except Exception as e:
-            st.warning(f"Could not generate SHAP plot: {e}")
+                    if impact > 0:
+                        st.markdown(f"🔴 **{feature}** ({val}): Increases Risk")
+                    else:
+                        st.markdown(f"🟢 **{feature}** ({val}): Decreases Risk")
 
-# --- Footer ---
+                st.write("---")
+
+                fig, ax = plt.subplots(figsize=(8, 5))
+                shap.plots.waterfall(
+                    shap.Explanation(
+                        values=shap_val_to_plot,
+                        base_values=explainer.expected_value[1] if isinstance(
+                            shap_values, list) else explainer.expected_value,
+                        data=st.session_state['input_df'].iloc[0],
+                        feature_names=feature_names
+                    ),
+                    max_display=8,
+                    show=False
+                )
+                st.pyplot(fig)
+
+            except Exception as e:
+                st.warning(f"Explanation could not be generated: {e}")
+    else:
+        st.info("👈 Enter data and click 'RUN DIAGNOSIS' to start.")
+
+# --- 8. Footer ---
 st.markdown("---")
-st.markdown("*Disclaimer: This tool is for educational purposes only and not a substitute for professional medical advice.*")
+st.caption("Developed for Intelligent Systems Module")
