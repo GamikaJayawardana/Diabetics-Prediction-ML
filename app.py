@@ -8,15 +8,12 @@ import shap
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 
-# --- 1. Page Configuration ---
+
 st.set_page_config(
     page_title="Diabetes Prediction System",
     page_icon="🏥",
     layout="wide"
 )
-
-# --- 2. Load Models & Assets ---
-
 
 @st.cache_resource
 def load_assets():
@@ -30,7 +27,7 @@ def load_assets():
 
 model = load_assets()
 
-# --- 3. Custom CSS for Styling ---
+
 st.markdown("""
 <style>
 div.stButton > button:first-child {
@@ -53,7 +50,6 @@ div.stButton > button:first-child:hover {
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. Helper Functions ---
 
 
 def get_radar_chart(input_data, risk_color):
@@ -97,8 +93,6 @@ def get_radar_chart(input_data, risk_color):
     )
     return fig
 
-
-# --- 5. Main UI Layout ---
 st.title(" Intelligent Diabetes Prediction System")
 st.markdown(
     "Enter the patient's clinical data below to assess diabetes risk using **XGBoost AI**.")
@@ -149,7 +143,7 @@ with st.container():
 
 st.divider()
 
-# --- 6. Prediction & Results ---
+
 col_results, col_viz = st.columns([1, 1.5])
 
 with col_results:
@@ -157,17 +151,14 @@ with col_results:
 
     if st.button("RUN DIAGNOSIS", use_container_width=True):
 
-        # --- FIX: BYPASS SCALING ---
-        # We send the RAW data directly to the model.
+       
         user_data = input_df.values
 
-        # Optional: Replace 0 with NaN for biological metrics
         cols_missing_vals = [1, 2, 3, 4, 5]
         for col in cols_missing_vals:
             if user_data[0, col] == 0:
                 user_data[0, col] = np.nan
 
-        # Direct Prediction on RAW Data
         try:
             prediction_proba = model.predict_proba(user_data)
             diabetic_prob = float(prediction_proba[0][1])
@@ -175,7 +166,6 @@ with col_results:
             st.error(f"Prediction Error: {e}")
             diabetic_prob = 0.0
 
-        # Determine Status
         if diabetic_prob > 0.5:
             result_color = "red"
             result_header = "🔴 HIGH RISK DETECTED"
@@ -185,16 +175,16 @@ with col_results:
             result_header = "🟢 LOW RISK / HEALTHY"
             result_msg = "Great! The model indicates a low probability of diabetes."
 
-        # Save to Session State
+     
         st.session_state['run_analysis'] = True
-        st.session_state['user_data'] = user_data  # Save raw data
+        st.session_state['user_data'] = user_data 
         st.session_state['diabetic_prob'] = diabetic_prob
         st.session_state['input_df'] = input_df
         st.session_state['result_color'] = result_color
         st.session_state['result_header'] = result_header
         st.session_state['result_msg'] = result_msg
 
-    # Display Results
+
     if 'run_analysis' in st.session_state and st.session_state['run_analysis']:
         header = st.session_state['result_header']
         msg = st.session_state['result_msg']
@@ -211,7 +201,7 @@ with col_results:
                 <p style="margin-top:10px; font-size:18px;">{msg}</p>
             </div>
             """, unsafe_allow_html=True)
-            # BALLOONS REMOVED HERE
+            
         else:
             st.markdown(f"""
             <div style="background-color: #f8d7da; color: #721c24; padding: 20px; border-radius: 10px; border: 2px solid #f5c6cb; text-align: center;">
@@ -225,7 +215,7 @@ with col_results:
         st.write(f"**Confidence Score:** {prob*100:.1f}%")
         st.progress(prob)
 
-# --- 7. Visualization Section ---
+
 with col_viz:
     if 'run_analysis' in st.session_state and st.session_state['run_analysis']:
 
@@ -239,7 +229,7 @@ with col_viz:
         with tab2:
             st.write("### What is driving this result?")
             try:
-                # Use RAW data for SHAP
+              
                 data_for_shap = st.session_state['user_data']
                 explainer = shap.TreeExplainer(model)
                 shap_values = explainer.shap_values(data_for_shap)
