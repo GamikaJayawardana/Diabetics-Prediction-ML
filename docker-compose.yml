@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mounts your local code to the container for live-reloading during dev
+      - ./backend:/app 
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Tells the frontend where to find the backend API locally
+        - VITE_API_URL=http://localhost:8000 
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
