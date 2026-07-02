@@ -41,5 +41,5 @@ jobs:
       run: |
         # Optional: You can pass a production VITE_API_URL here if you have an active domain, 
         # otherwise we leave it blank for now.
-        docker build -t $ECR_REGISTRY/$FRONTEND_REPO:latest ./frontend
+        docker build --build-arg VITE_API_URL=${{ secrets.PRODUCTION_API_URL }} -t $ECR_REGISTRY/$FRONTEND_REPO:latest ./frontend
         docker push $ECR_REGISTRY/$FRONTEND_REPO:latest
