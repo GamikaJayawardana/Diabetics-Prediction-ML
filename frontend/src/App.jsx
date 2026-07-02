@@ -93,10 +93,7 @@ function AppContent() {
     const baseURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
     try {
-      const response = await axios.post(
-        "${baseURL}/predict",
-        payload,
-      );
+      const response = await axios.post(`${baseURL}/predict`, payload);
       setResult(response.data);
     } catch (err) {
       setError(err.response?.data?.detail || 'Server connection error.');
