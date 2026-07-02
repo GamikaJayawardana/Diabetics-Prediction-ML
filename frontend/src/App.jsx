@@ -90,7 +90,8 @@ function AppContent() {
       payload[key] = parseFloat(formData[key]);
     }
 
-    const baseURL = "http://13.60.76.3:8000";
+    const currentIP = window.location.hostname;
+    const baseURL = `http://${currentIP}:8000`;
 
     try {
       const response = await axios.post(`${baseURL}/predict`, payload);
