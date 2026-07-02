@@ -90,7 +90,7 @@ function AppContent() {
       payload[key] = parseFloat(formData[key]);
     }
 
-    const baseURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+    const baseURL = "http://13.60.76.3:8000";
 
     try {
       const response = await axios.post(`${baseURL}/predict`, payload);
