@@ -1,0 +1,45 @@
+name: Build and Push to AWS ECR
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  BACKEND_REPO: diabetes-backend
+  FRONTEND_REPO: diabetes-frontend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and Push Backend
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        docker build -t $ECR_REGISTRY/$BACKEND_REPO:latest ./backend
+        docker push $ECR_REGISTRY/$BACKEND_REPO:latest
+
+    - name: Build and Push Frontend
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        # Optional: You can pass a production VITE_API_URL here if you have an active domain, 
+        # otherwise we leave it blank for now.
+        docker build -t $ECR_REGISTRY/$FRONTEND_REPO:latest ./frontend
+        docker push $ECR_REGISTRY/$FRONTEND_REPO:latest
